@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  bonded-agent:
+    build: .
+    container_name: bonded-content-agent
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./logs:/app/logs
+      - ./data:/app/data
+    # The container runs cron which triggers the agent daily
+    # You can also run manually: docker exec bonded-content-agent python src/main.py

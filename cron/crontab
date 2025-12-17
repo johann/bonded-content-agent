@@ -1,0 +1,4 @@
+# Run the content agent daily at 8 AM UTC
+0 8 * * * cd /app && /usr/local/bin/python src/main.py >> /app/logs/agent.log 2>&1
+
+# Empty line required at end of crontab
