@@ -94,8 +94,22 @@ def check_article_exists(client: Client, url: str) -> bool:
         return False
 
 
-def save_article(client: Client, title: str, blurb: str, url: str, image_url: str = None) -> dict:
-    """Save a new article to the database."""
+def save_article(
+    client: Client,
+    title: str,
+    blurb: str,
+    url: str,
+    image_url: str = None,
+    relevance_score: float = None,
+    actionability_score: float = None,
+    depth_score: float = None,
+    freshness_score: float = None,
+    category: str = None,
+    tags: list = None,
+    reading_time_minutes: int = None,
+    difficulty: str = None
+) -> dict:
+    """Save a new article to the database with quality scores and metadata."""
     try:
         data = {
             "title": title,
@@ -103,11 +117,33 @@ def save_article(client: Client, title: str, blurb: str, url: str, image_url: st
             "url": url,
             "is_active": True,
         }
+
+        # Add optional fields if provided
         if image_url:
             data["image_url"] = image_url
-            
+        if relevance_score is not None:
+            data["relevance_score"] = relevance_score
+        if actionability_score is not None:
+            data["actionability_score"] = actionability_score
+        if depth_score is not None:
+            data["depth_score"] = depth_score
+        if freshness_score is not None:
+            data["freshness_score"] = freshness_score
+        if category:
+            data["category"] = category
+        if tags:
+            data["tags"] = tags
+        if reading_time_minutes is not None:
+            data["reading_time_minutes"] = reading_time_minutes
+        if difficulty:
+            data["difficulty"] = difficulty
+
+        # Calculate overall score as average of the 4 dimension scores
+        if all(score is not None for score in [relevance_score, actionability_score, depth_score, freshness_score]):
+            data["overall_score"] = (relevance_score + actionability_score + depth_score + freshness_score) / 4
+
         result = client.table("articles").insert(data).execute()
-        logger.info(f"Saved article: {title}")
+        logger.info(f"Saved article: {title} (category: {category}, overall_score: {data.get('overall_score', 'N/A')})")
         return {"success": True, "id": result.data[0]["id"] if result.data else None}
     except Exception as e:
         logger.error(f"Error saving article: {e}")

@@ -85,10 +85,45 @@ TOOL_DEFINITIONS = [
                 },
                 "image_url": {
                     "type": "string",
-                    "description": "Optional image URL for the article"
+                    "description": "Image URL for the article"
+                },
+                "relevance_score": {
+                    "type": "number",
+                    "description": "Score 0-10: How relevant is this to Bonded's audience (committed couples seeking relationship improvement)"
+                },
+                "actionability_score": {
+                    "type": "number",
+                    "description": "Score 0-10: How actionable is the advice (concrete steps vs abstract concepts)"
+                },
+                "depth_score": {
+                    "type": "number",
+                    "description": "Score 0-10: Depth of content (superficial listicle vs evidence-based insights)"
+                },
+                "freshness_score": {
+                    "type": "number",
+                    "description": "Score 0-10: Novelty and timeliness (evergreen content scores 5-7, trending topics 8-10)"
+                },
+                "category": {
+                    "type": "string",
+                    "enum": ["communication", "conflict", "intimacy", "trust", "parenting", "finances", "growth", "wellness"],
+                    "description": "Primary category that best describes the article's main topic"
+                },
+                "tags": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "3-5 relevant tags for the article (e.g., 'active listening', 'date night', 'emotional intelligence')"
+                },
+                "reading_time_minutes": {
+                    "type": "integer",
+                    "description": "Estimated reading time in minutes"
+                },
+                "difficulty": {
+                    "type": "string",
+                    "enum": ["beginner", "intermediate", "advanced"],
+                    "description": "Difficulty level: beginner (simple concepts), intermediate (some relationship knowledge), advanced (complex issues/therapy concepts)"
                 }
             },
-            "required": ["title", "blurb", "url"]
+            "required": ["title", "blurb", "url", "image_url", "relevance_score", "actionability_score", "depth_score", "freshness_score", "category", "tags", "reading_time_minutes", "difficulty"]
         }
     },
     {
@@ -468,13 +503,21 @@ def check_url_exists(url: str, supabase_client: Client) -> dict:
 
 
 def save_article_to_database(
-    title: str, 
-    blurb: str, 
-    url: str, 
+    title: str,
+    blurb: str,
+    url: str,
     supabase_client: Client,
-    image_url: Optional[str] = None
+    image_url: Optional[str] = None,
+    relevance_score: Optional[float] = None,
+    actionability_score: Optional[float] = None,
+    depth_score: Optional[float] = None,
+    freshness_score: Optional[float] = None,
+    category: Optional[str] = None,
+    tags: Optional[list] = None,
+    reading_time_minutes: Optional[int] = None,
+    difficulty: Optional[str] = None
 ) -> dict:
-    """Save an article to the database."""
+    """Save an article to the database with quality scores and metadata."""
     # Double-check it doesn't exist
     if check_article_exists(supabase_client, url):
         return {
@@ -482,8 +525,22 @@ def save_article_to_database(
             "error": "Article already exists",
             "url": url
         }
-    
-    result = save_article(supabase_client, title, blurb, url, image_url)
+
+    result = save_article(
+        supabase_client,
+        title,
+        blurb,
+        url,
+        image_url,
+        relevance_score,
+        actionability_score,
+        depth_score,
+        freshness_score,
+        category,
+        tags,
+        reading_time_minutes,
+        difficulty
+    )
     result["url"] = url
     result["title"] = title
     return result
@@ -515,7 +572,15 @@ def execute_tool(tool_name: str, tool_input: dict, supabase_client: Client) -> s
                 blurb=tool_input["blurb"],
                 url=tool_input["url"],
                 supabase_client=supabase_client,
-                image_url=tool_input.get("image_url")
+                image_url=tool_input.get("image_url"),
+                relevance_score=tool_input.get("relevance_score"),
+                actionability_score=tool_input.get("actionability_score"),
+                depth_score=tool_input.get("depth_score"),
+                freshness_score=tool_input.get("freshness_score"),
+                category=tool_input.get("category"),
+                tags=tool_input.get("tags"),
+                reading_time_minutes=tool_input.get("reading_time_minutes"),
+                difficulty=tool_input.get("difficulty")
             )
         elif tool_name == "get_all_existing_urls":
             result = get_all_existing_urls_tool(supabase_client)
