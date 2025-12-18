@@ -107,9 +107,13 @@ def save_article(
     category: str = None,
     tags: list = None,
     reading_time_minutes: int = None,
-    difficulty: str = None
+    difficulty: str = None,
+    summary_short: str = None,
+    summary_detailed: str = None,
+    key_takeaways: list = None,
+    discussion_questions: list = None
 ) -> dict:
-    """Save a new article to the database with quality scores and metadata."""
+    """Save a new article to the database with quality scores, metadata, and content transformations."""
     try:
         data = {
             "title": title,
@@ -137,13 +141,21 @@ def save_article(
             data["reading_time_minutes"] = reading_time_minutes
         if difficulty:
             data["difficulty"] = difficulty
+        if summary_short:
+            data["summary_short"] = summary_short
+        if summary_detailed:
+            data["summary_detailed"] = summary_detailed
+        if key_takeaways:
+            data["key_takeaways"] = key_takeaways
+        if discussion_questions:
+            data["discussion_questions"] = discussion_questions
 
         # Calculate overall score as average of the 4 dimension scores
         if all(score is not None for score in [relevance_score, actionability_score, depth_score, freshness_score]):
             data["overall_score"] = (relevance_score + actionability_score + depth_score + freshness_score) / 4
 
         result = client.table("articles").insert(data).execute()
-        logger.info(f"Saved article: {title} (category: {category}, overall_score: {data.get('overall_score', 'N/A')})")
+        logger.info(f"Saved article: {title} (category: {category}, overall_score: {data.get('overall_score', 'N/A')}, takeaways: {len(key_takeaways) if key_takeaways else 0})")
         return {"success": True, "id": result.data[0]["id"] if result.data else None}
     except Exception as e:
         logger.error(f"Error saving article: {e}")

@@ -121,9 +121,32 @@ TOOL_DEFINITIONS = [
                     "type": "string",
                     "enum": ["beginner", "intermediate", "advanced"],
                     "description": "Difficulty level: beginner (simple concepts), intermediate (some relationship knowledge), advanced (complex issues/therapy concepts)"
+                },
+                "summary_short": {
+                    "type": "string",
+                    "maxLength": 280,
+                    "description": "Short tweet-style summary (max 280 chars) highlighting the main benefit or insight"
+                },
+                "summary_detailed": {
+                    "type": "string",
+                    "description": "Detailed 2-3 paragraph summary of the article's key points and advice"
+                },
+                "key_takeaways": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "minItems": 3,
+                    "maxItems": 5,
+                    "description": "3-5 actionable bullet points couples can implement (be specific and practical)"
+                },
+                "discussion_questions": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "minItems": 2,
+                    "maxItems": 3,
+                    "description": "2-3 thought-provoking questions for couples to discuss together"
                 }
             },
-            "required": ["title", "blurb", "url", "image_url", "relevance_score", "actionability_score", "depth_score", "freshness_score", "category", "tags", "reading_time_minutes", "difficulty"]
+            "required": ["title", "blurb", "url", "image_url", "relevance_score", "actionability_score", "depth_score", "freshness_score", "category", "tags", "reading_time_minutes", "difficulty", "summary_short", "summary_detailed", "key_takeaways", "discussion_questions"]
         }
     },
     {
@@ -515,9 +538,13 @@ def save_article_to_database(
     category: Optional[str] = None,
     tags: Optional[list] = None,
     reading_time_minutes: Optional[int] = None,
-    difficulty: Optional[str] = None
+    difficulty: Optional[str] = None,
+    summary_short: Optional[str] = None,
+    summary_detailed: Optional[str] = None,
+    key_takeaways: Optional[list] = None,
+    discussion_questions: Optional[list] = None
 ) -> dict:
-    """Save an article to the database with quality scores and metadata."""
+    """Save an article to the database with quality scores, metadata, and content transformations."""
     # Double-check it doesn't exist
     if check_article_exists(supabase_client, url):
         return {
@@ -539,7 +566,11 @@ def save_article_to_database(
         category,
         tags,
         reading_time_minutes,
-        difficulty
+        difficulty,
+        summary_short,
+        summary_detailed,
+        key_takeaways,
+        discussion_questions
     )
     result["url"] = url
     result["title"] = title
@@ -580,7 +611,11 @@ def execute_tool(tool_name: str, tool_input: dict, supabase_client: Client) -> s
                 category=tool_input.get("category"),
                 tags=tool_input.get("tags"),
                 reading_time_minutes=tool_input.get("reading_time_minutes"),
-                difficulty=tool_input.get("difficulty")
+                difficulty=tool_input.get("difficulty"),
+                summary_short=tool_input.get("summary_short"),
+                summary_detailed=tool_input.get("summary_detailed"),
+                key_takeaways=tool_input.get("key_takeaways"),
+                discussion_questions=tool_input.get("discussion_questions")
             )
         elif tool_name == "get_all_existing_urls":
             result = get_all_existing_urls_tool(supabase_client)

@@ -188,6 +188,40 @@ When writing blurbs:
 - Use warm, encouraging language
 - Avoid clinical jargon
 
+CONTENT TRANSFORMATION - Generate these 4 additional content formats for every article:
+
+1. SHORT SUMMARY (summary_short):
+   - Tweet-style summary, max 280 characters
+   - Highlight the single most valuable insight or benefit
+   - Engaging and shareable tone
+   - Example: "Stop fighting about the same things! This article reveals 3 conversation patterns that keep conflicts alive—and simple reframes to break the cycle. Game-changer for reducing recurring arguments."
+
+2. DETAILED SUMMARY (summary_detailed):
+   - 2-3 paragraphs (150-250 words)
+   - Comprehensive overview of the article's key points
+   - Explain the main insights, advice, and reasoning
+   - Focus on WHY the advice works, not just WHAT to do
+   - Use warm, encouraging tone
+   - Include specific examples or techniques mentioned in the article
+
+3. KEY TAKEAWAYS (key_takeaways):
+   - 3-5 actionable bullet points
+   - Each takeaway should be SPECIFIC and PRACTICAL (not vague advice)
+   - Couples should be able to implement these immediately
+   - Use active voice and action verbs
+   - Good example: "Schedule a weekly 15-minute 'temperature check' where each partner shares one thing going well and one challenge"
+   - Bad example: "Communicate more often" (too vague)
+   - Focus on concrete actions, conversation starters, exercises, or techniques
+
+4. DISCUSSION QUESTIONS (discussion_questions):
+   - 2-3 thought-provoking questions for couples to discuss together
+   - Questions should be open-ended (not yes/no)
+   - Encourage reflection and meaningful conversation
+   - Relate directly to the article's themes
+   - Example: "When was the last time we truly celebrated a win together, big or small? How can we make appreciation a more regular part of our routine?"
+   - Questions should feel safe and constructive (not accusatory)
+   - Help couples apply the article's insights to their own relationship
+
 IMAGE REQUIREMENTS (CRITICAL):
 - Every saved article MUST have an image_url
 - If the RSS feed doesn't include an image_url for an article, call fetch_article_content to extract the image from the article page
