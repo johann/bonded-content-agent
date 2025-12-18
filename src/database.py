@@ -298,3 +298,89 @@ def update_source_avg_score(client: Client, source_id: str) -> dict:
     except Exception as e:
         logger.error(f"Error updating source average score: {e}")
         return {"success": False, "error": str(e)}
+
+
+# ============================================================================
+# ENGAGEMENT TRACKING FUNCTIONS
+# ============================================================================
+
+def get_top_performing_articles(client: Client, limit: int = 10, days: int = 30) -> list:
+    """Get top performing articles by engagement score in the last N days."""
+    try:
+        # Calculate date threshold
+        from datetime import datetime, timedelta
+        threshold = datetime.now() - timedelta(days=days)
+
+        # Query top articles with engagement data
+        result = client.table("article_engagement") \
+            .select("*, articles!inner(id, title, url, category, overall_score)") \
+            .gte("last_view_at", threshold.isoformat()) \
+            .order("engagement_score", desc=True) \
+            .limit(limit) \
+            .execute()
+
+        articles = []
+        for row in result.data:
+            article = row.get("articles", {})
+            articles.append({
+                "title": article.get("title"),
+                "url": article.get("url"),
+                "category": article.get("category"),
+                "overall_score": article.get("overall_score"),
+                "engagement_score": row.get("engagement_score"),
+                "save_count": row.get("save_count"),
+                "view_count": row.get("view_count"),
+                "save_rate": row.get("save_rate"),
+                "discussion_rate": row.get("discussion_rate")
+            })
+
+        logger.info(f"Retrieved {len(articles)} top performing articles from last {days} days")
+        return articles
+
+    except Exception as e:
+        logger.error(f"Error fetching top performing articles: {e}")
+        return []
+
+
+def get_engagement_stats(client: Client, days: int = 30) -> dict:
+    """Get overall engagement statistics for the last N days."""
+    try:
+        from datetime import datetime, timedelta
+        threshold = datetime.now() - timedelta(days=days)
+
+        # Get aggregated stats
+        result = client.table("article_engagement") \
+            .select("*") \
+            .gte("last_view_at", threshold.isoformat()) \
+            .execute()
+
+        if not result.data:
+            return {
+                "period_days": days,
+                "total_articles": 0,
+                "total_views": 0,
+                "total_saves": 0,
+                "avg_save_rate": 0,
+                "avg_engagement_score": 0
+            }
+
+        total_views = sum(row.get("view_count", 0) for row in result.data)
+        total_saves = sum(row.get("save_count", 0) for row in result.data)
+        save_rates = [row.get("save_rate", 0) for row in result.data if row.get("save_rate")]
+        engagement_scores = [row.get("engagement_score", 0) for row in result.data if row.get("engagement_score")]
+
+        stats = {
+            "period_days": days,
+            "total_articles": len(result.data),
+            "total_views": total_views,
+            "total_saves": total_saves,
+            "avg_save_rate": round(sum(save_rates) / len(save_rates), 1) if save_rates else 0,
+            "avg_engagement_score": round(sum(engagement_scores) / len(engagement_scores), 1) if engagement_scores else 0
+        }
+
+        logger.info(f"Retrieved engagement stats for last {days} days: {stats['total_views']} views, {stats['total_saves']} saves")
+        return stats
+
+    except Exception as e:
+        logger.error(f"Error fetching engagement stats: {e}")
+        return {"error": str(e)}

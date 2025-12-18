@@ -13,7 +13,7 @@ from urllib.parse import urljoin, urlparse
 import re
 from supabase import Client
 
-from database import check_article_exists, save_article, get_existing_urls
+from database import check_article_exists, save_article, get_existing_urls, get_top_performing_articles, get_engagement_stats
 
 logger = logging.getLogger(__name__)
 
@@ -159,6 +159,41 @@ TOOL_DEFINITIONS = [
         "input_schema": {
             "type": "object",
             "properties": {},
+            "required": []
+        }
+    },
+    {
+        "name": "get_top_performing_articles",
+        "description": "Get top performing articles by user engagement from the last N days. Use this BEFORE curating to understand what content resonates with users.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "limit": {
+                    "type": "integer",
+                    "description": "Number of top articles to retrieve (default: 10)",
+                    "default": 10
+                },
+                "days": {
+                    "type": "integer",
+                    "description": "Look back period in days (default: 30)",
+                    "default": 30
+                }
+            },
+            "required": []
+        }
+    },
+    {
+        "name": "get_engagement_stats",
+        "description": "Get overall engagement statistics (views, saves, rates) from the last N days to understand user behavior patterns.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "days": {
+                    "type": "integer",
+                    "description": "Look back period in days (default: 30)",
+                    "default": 30
+                }
+            },
             "required": []
         }
     }
@@ -627,6 +662,19 @@ def execute_tool(tool_name: str, tool_input: dict, supabase_client: Client) -> s
             )
         elif tool_name == "get_all_existing_urls":
             result = get_all_existing_urls_tool(supabase_client)
+        elif tool_name == "get_top_performing_articles":
+            result = {
+                "articles": get_top_performing_articles(
+                    supabase_client,
+                    limit=tool_input.get("limit", 10),
+                    days=tool_input.get("days", 30)
+                )
+            }
+        elif tool_name == "get_engagement_stats":
+            result = get_engagement_stats(
+                supabase_client,
+                days=tool_input.get("days", 30)
+            )
         else:
             result = {"error": f"Unknown tool: {tool_name}"}
             

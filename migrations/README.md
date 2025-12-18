@@ -101,6 +101,76 @@ After running this migration, populate sources from hardcoded config:
 python scripts/migrate_sources_to_db.py
 ```
 
+### 004_create_engagement_tables.sql
+**Date:** 2025-01-XX
+**Phase:** Phase 5 - Engagement Tracking Integration
+**Dependencies:** Requires 001_add_quality_scores.sql
+
+Enables data-driven curation by tracking user engagement:
+- Raw event tracking (views, saves, shares, click-throughs, discussions)
+- Aggregated engagement metrics per article
+- Automated metric calculation functions
+- Agent learns from what content performs best
+
+**New Tables:**
+- `engagement_events` - Raw engagement events from app
+- `article_engagement` - Aggregated metrics per article
+
+**Event Types:**
+- `view` - Article card shown to user
+- `save` - User bookmarked article
+- `share` - User shared article
+- `click_through` - User opened original article
+- `discussion_start` - User started discussing with partner
+- `unsave` - User removed bookmark
+
+**Calculated Metrics:**
+- Save rate (% of viewers who saved)
+- Share rate (% of viewers who shared)
+- Click rate (% of viewers who clicked through)
+- Discussion rate (% of viewers who started discussion)
+- Engagement score (weighted composite: discussion 4x, save 3x, share 2x, click 1.5x)
+
+**Functions:**
+- `refresh_article_engagement(article_id)` - Recalculate metrics for one article
+- `refresh_all_article_engagement()` - Recalculate all (run periodically)
+
+**Indexes:**
+- `idx_engagement_events_article_id` - Fast event lookup
+- `idx_engagement_events_event_type` - Filter by event type
+- `idx_engagement_events_created_at` - Time-based queries
+- `idx_article_engagement_engagement_score` - Sort by engagement
+- `idx_article_engagement_save_count` - Popular content
+
+**Agent Integration:**
+- Agent calls `get_top_performing_articles` before curating
+- Agent calls `get_engagement_stats` to understand patterns
+- Agent learns which categories/topics/formats work best
+- Curation becomes data-driven over time
+
+**App Implementation Required:**
+Your Bonded app needs to track events:
+```javascript
+// When article card is shown
+await supabase.from('engagement_events').insert({
+  article_id: article.id,
+  event_type: 'view',
+  user_id: user.id // optional
+})
+
+// When user saves/shares/etc
+await supabase.from('engagement_events').insert({
+  article_id: article.id,
+  event_type: 'save', // or 'share', 'click_through', 'discussion_start'
+  user_id: user.id
+})
+```
+
+Then refresh metrics periodically (cron job or edge function):
+```sql
+SELECT refresh_all_article_engagement();
+```
+
 ## Verification
 
 After applying a migration, verify the changes:
