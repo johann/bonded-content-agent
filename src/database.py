@@ -480,3 +480,86 @@ def get_content_gaps(client: Client) -> list:
     except Exception as e:
         logger.error(f"Error identifying content gaps: {e}")
         return []
+
+
+# ============================================================================
+# RELATED CONTENT FUNCTIONS
+# ============================================================================
+
+def get_related_articles(client: Client, article_id: str, limit: int = 5) -> list:
+    """Get related articles for a given article."""
+    try:
+        result = client.rpc("calculate_related_articles", {
+            "p_article_id": article_id,
+            "p_limit": limit
+        }).execute()
+
+        if not result.data:
+            return []
+
+        related = [
+            {
+                "id": row["related_article_id"],
+                "title": row["title"],
+                "category": row["category"],
+                "similarity_score": round(row.get("similarity_score", 0), 1),
+                "relationship_type": row["relationship_type"],
+                "shared_tags": row.get("shared_tags", [])
+            }
+            for row in result.data
+        ]
+
+        logger.info(f"Retrieved {len(related)} related articles for article {article_id}")
+        return related
+
+    except Exception as e:
+        logger.error(f"Error fetching related articles: {e}")
+        return []
+
+
+def refresh_article_relationships(client: Client, article_id: str) -> dict:
+    """Refresh related article relationships for a single article."""
+    try:
+        result = client.rpc("refresh_related_articles", {
+            "p_article_id": article_id
+        }).execute()
+
+        relationships_count = result.data if result.data else 0
+
+        logger.info(f"Refreshed relationships for article {article_id}: {relationships_count} related articles found")
+
+        return {
+            "success": True,
+            "article_id": article_id,
+            "relationships_count": relationships_count
+        }
+
+    except Exception as e:
+        logger.error(f"Error refreshing article relationships: {e}")
+        return {"success": False, "error": str(e)}
+
+
+def get_article_with_related(client: Client, article_id: str) -> dict:
+    """Get an article with its related articles embedded."""
+    try:
+        result = client.table("articles_with_related") \
+            .select("*") \
+            .eq("id", article_id) \
+            .execute()
+
+        if not result.data:
+            return {"success": False, "error": "Article not found"}
+
+        article = result.data[0]
+        related_count = len(article.get("related_articles", []) or [])
+
+        logger.info(f"Retrieved article {article_id} with {related_count} related articles")
+
+        return {
+            "success": True,
+            "article": article
+        }
+
+    except Exception as e:
+        logger.error(f"Error fetching article with related content: {e}")
+        return {"success": False, "error": str(e)}

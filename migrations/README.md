@@ -349,6 +349,98 @@ result = agent.analyze_week(days=7)
 print(result["summary"])
 ```
 
+### 007_add_related_content.sql
+**Date:** 2025-01-XX
+**Phase:** Phase 8 - Related Content Linking
+**Dependencies:** Requires 001_add_quality_scores.sql
+
+Enables automatic discovery of related articles to improve content discovery and user engagement:
+- Calculated relationships between articles based on similarity
+- Multi-factor similarity scoring (category, tags, source)
+- Automatic relationship calculation on article insert
+- Flexible relationship types
+- Efficient querying via dedicated table and indexes
+
+**New Table:**
+- `article_relationships` - Stores calculated article-to-article relationships
+
+**New View:**
+- `articles_with_related` - Articles with top 5 related articles embedded as JSON
+
+**New Functions:**
+- `calculate_related_articles(article_id, limit)` - Find related articles with scores
+- `refresh_related_articles(article_id)` - Recalculate relationships for one article
+- `refresh_all_related_articles()` - Recalculate all relationships (periodic maintenance)
+
+**Relationship Types:**
+- `same_category` - Articles in the same category
+- `overlapping_tags` - Share multiple tags
+- `same_source` - From the same blog source
+- `similar_topics` - Similar category AND overlapping tags
+- `complementary` - Related but different focus
+
+**Similarity Scoring (0-100):**
+- Same category: +30 points
+- Tag overlap: up to +50 points (Jaccard similarity)
+- Same source: +20 points
+- Minimum threshold: 10 points
+
+**Auto-Calculation:**
+- Trigger automatically calculates relationships when new articles are inserted
+- No manual refresh needed for new content
+- Can manually refresh existing content as needed
+
+**Agent Integration:**
+- Tools: `get_related_articles`, `get_article_with_related`
+- Agent can query related content during curation
+- Understands content relationships and topic clusters
+
+**Usage Examples:**
+
+```sql
+-- Find related articles for a specific article
+SELECT * FROM calculate_related_articles('article-uuid-here', 5);
+
+-- Manually refresh relationships for one article
+SELECT refresh_related_articles('article-uuid-here');
+
+-- Get article with related content embedded
+SELECT * FROM articles_with_related WHERE id = 'article-uuid-here';
+
+-- Refresh all relationships (run periodically if tags/categories change)
+SELECT * FROM refresh_all_related_articles();
+```
+
+**Python Integration:**
+```python
+from src.database import get_related_articles, get_article_with_related, get_supabase_client
+
+client = get_supabase_client()
+
+# Get related articles
+related = get_related_articles(client, article_id="uuid-here", limit=5)
+for r in related:
+    print(f"{r['title']} (similarity: {r['similarity_score']})")
+
+# Get article with related content
+result = get_article_with_related(client, article_id="uuid-here")
+article = result["article"]
+print(f"Related articles: {len(article['related_articles'])}")
+```
+
+**Use Cases:**
+- "Related Articles" section in app UI
+- Content discovery recommendations
+- Topic cluster analysis
+- Content strategy insights
+- User engagement paths
+
+**Performance:**
+- Indexed for fast lookups by article_id
+- Relationships pre-calculated and stored
+- View provides convenient JSON format for API responses
+- Automatic updates via trigger
+
 ## Verification
 
 After applying a migration, verify the changes:

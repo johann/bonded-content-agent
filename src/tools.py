@@ -16,7 +16,8 @@ from supabase import Client
 from database import (
     check_article_exists, save_article, get_existing_urls,
     get_top_performing_articles, get_engagement_stats,
-    get_latest_analysis_report, get_trending_topics, get_content_gaps
+    get_latest_analysis_report, get_trending_topics, get_content_gaps,
+    get_related_articles, get_article_with_related
 )
 
 logger = logging.getLogger(__name__)
@@ -232,6 +233,39 @@ TOOL_DEFINITIONS = [
             "type": "object",
             "properties": {},
             "required": []
+        }
+    },
+    {
+        "name": "get_related_articles",
+        "description": "Get related articles for a given article based on category, tags, and topic similarity. Useful for understanding content relationships.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "article_id": {
+                    "type": "string",
+                    "description": "The UUID of the article to find related content for"
+                },
+                "limit": {
+                    "type": "integer",
+                    "description": "Maximum number of related articles to return (default: 5)",
+                    "default": 5
+                }
+            },
+            "required": ["article_id"]
+        }
+    },
+    {
+        "name": "get_article_with_related",
+        "description": "Get a complete article with its related articles embedded. Shows the article plus up to 5 most similar articles.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "article_id": {
+                    "type": "string",
+                    "description": "The UUID of the article to retrieve with related content"
+                }
+            },
+            "required": ["article_id"]
         }
     }
 ]
@@ -725,6 +759,19 @@ def execute_tool(tool_name: str, tool_input: dict, supabase_client: Client) -> s
             result = {
                 "content_gaps": get_content_gaps(supabase_client)
             }
+        elif tool_name == "get_related_articles":
+            result = {
+                "related_articles": get_related_articles(
+                    supabase_client,
+                    article_id=tool_input["article_id"],
+                    limit=tool_input.get("limit", 5)
+                )
+            }
+        elif tool_name == "get_article_with_related":
+            result = get_article_with_related(
+                supabase_client,
+                article_id=tool_input["article_id"]
+            )
         else:
             result = {"error": f"Unknown tool: {tool_name}"}
             
