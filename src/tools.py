@@ -17,7 +17,8 @@ from database import (
     check_article_exists, save_article, get_existing_urls,
     get_top_performing_articles, get_engagement_stats,
     get_latest_analysis_report, get_trending_topics, get_content_gaps,
-    get_related_articles, get_article_with_related
+    get_related_articles, get_article_with_related,
+    get_all_collections, get_collection_by_slug
 )
 
 logger = logging.getLogger(__name__)
@@ -266,6 +267,35 @@ TOOL_DEFINITIONS = [
                 }
             },
             "required": ["article_id"]
+        }
+    },
+    {
+        "name": "get_all_collections",
+        "description": "Get all active collections. Collections are curated groups of articles organized by theme, category, or topic.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "include_inactive": {
+                    "type": "boolean",
+                    "description": "Whether to include inactive collections (default: false)",
+                    "default": false
+                }
+            },
+            "required": []
+        }
+    },
+    {
+        "name": "get_collection_by_slug",
+        "description": "Get a specific collection by its slug with all articles included. Useful for viewing what's in a collection.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "slug": {
+                    "type": "string",
+                    "description": "The slug of the collection (e.g., 'category-communication', 'tag-active-listening', 'high-engagement')"
+                }
+            },
+            "required": ["slug"]
         }
     }
 ]
@@ -771,6 +801,18 @@ def execute_tool(tool_name: str, tool_input: dict, supabase_client: Client) -> s
             result = get_article_with_related(
                 supabase_client,
                 article_id=tool_input["article_id"]
+            )
+        elif tool_name == "get_all_collections":
+            result = {
+                "collections": get_all_collections(
+                    supabase_client,
+                    include_inactive=tool_input.get("include_inactive", False)
+                )
+            }
+        elif tool_name == "get_collection_by_slug":
+            result = get_collection_by_slug(
+                supabase_client,
+                slug=tool_input["slug"]
             )
         else:
             result = {"error": f"Unknown tool: {tool_name}"}

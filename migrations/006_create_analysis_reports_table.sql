@@ -39,16 +39,44 @@ CREATE TABLE IF NOT EXISTS content_analysis_reports (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
 
+-- Ensure all columns exist (in case table was created without some columns)
+ALTER TABLE content_analysis_reports
+ADD COLUMN IF NOT EXISTS report_type TEXT,
+ADD COLUMN IF NOT EXISTS period_start TIMESTAMP WITH TIME ZONE,
+ADD COLUMN IF NOT EXISTS period_end TIMESTAMP WITH TIME ZONE,
+ADD COLUMN IF NOT EXISTS trending_topics JSONB,
+ADD COLUMN IF NOT EXISTS top_articles JSONB,
+ADD COLUMN IF NOT EXISTS top_sources JSONB,
+ADD COLUMN IF NOT EXISTS content_gaps JSONB,
+ADD COLUMN IF NOT EXISTS recommendations JSONB,
+ADD COLUMN IF NOT EXISTS total_articles_published INTEGER,
+ADD COLUMN IF NOT EXISTS total_articles_viewed INTEGER,
+ADD COLUMN IF NOT EXISTS total_engagement_score DECIMAL(10,2),
+ADD COLUMN IF NOT EXISTS avg_save_rate DECIMAL(5,2),
+ADD COLUMN IF NOT EXISTS avg_overall_score DECIMAL(3,1),
+ADD COLUMN IF NOT EXISTS category_distribution JSONB,
+ADD COLUMN IF NOT EXISTS summary TEXT,
+ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE;
+
 -- Create indexes
 CREATE INDEX IF NOT EXISTS idx_content_analysis_reports_period_end ON content_analysis_reports(period_end DESC);
 CREATE INDEX IF NOT EXISTS idx_content_analysis_reports_report_type ON content_analysis_reports(report_type);
 CREATE INDEX IF NOT EXISTS idx_content_analysis_reports_created_at ON content_analysis_reports(created_at DESC);
 
--- Add check constraint for report_type
-ALTER TABLE content_analysis_reports
-ADD CONSTRAINT report_type_enum CHECK (
-  report_type IN ('weekly', 'monthly', 'quarterly', 'custom')
-);
+-- Add check constraint for report_type (only if it doesn't exist)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint 
+    WHERE conname = 'report_type_enum' 
+    AND conrelid = 'content_analysis_reports'::regclass
+  ) THEN
+    ALTER TABLE content_analysis_reports
+    ADD CONSTRAINT report_type_enum CHECK (
+      report_type IN ('weekly', 'monthly', 'quarterly', 'custom')
+    );
+  END IF;
+END $$;
 
 -- Add comments
 COMMENT ON TABLE content_analysis_reports IS 'Weekly/periodic analysis reports with trends, gaps, and recommendations';
@@ -201,7 +229,7 @@ BEGIN
     GROUP BY tag
     HAVING
       COUNT(*) >= 3 -- Was popular (3+ articles)
-      AND EXTRACT(DAY FROM (now() - MAX(created_at))) > 14 -- No recent articles
+      AND EXTRACT(DAY FROM (now() - MAX(a.created_at))) > 14 -- No recent articles
       AND AVG(ae.engagement_score) > 20 -- Had good engagement
   ) stale_topics;
 
