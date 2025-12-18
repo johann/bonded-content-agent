@@ -145,6 +145,35 @@ def _make_absolute_url(url: str, base_url: str) -> str:
     return urljoin(base_url, url)
 
 
+def _verify_image_url(url: str) -> bool:
+    """Verify that an image URL is accessible and returns HTTP 200."""
+    if not url:
+        return False
+
+    try:
+        headers = {
+            "User-Agent": "Mozilla/5.0 (compatible; BondedBot/1.0; +https://bonded.app)"
+        }
+
+        with httpx.Client(timeout=10, follow_redirects=True) as client:
+            response = client.head(url, headers=headers)
+
+            # Some servers don't support HEAD, try GET if HEAD fails
+            if response.status_code == 405 or response.status_code == 404:
+                response = client.get(url, headers=headers)
+
+            if response.status_code == 200:
+                logger.debug(f"Image URL verified: {url}")
+                return True
+            else:
+                logger.debug(f"Image URL returned {response.status_code}: {url}")
+                return False
+
+    except Exception as e:
+        logger.debug(f"Failed to verify image URL {url}: {e}")
+        return False
+
+
 def _extract_first_image_from_html(html: str) -> Optional[str]:
     """Extract the first image from HTML content."""
     if not html:
@@ -164,6 +193,7 @@ def _extract_first_image_from_html(html: str) -> Optional[str]:
 def _extract_image_from_entry(entry: dict) -> Optional[str]:
     """
     Extract image URL from RSS entry with comprehensive fallback chain.
+    Verifies each URL returns HTTP 200 before accepting it.
 
     Checks in order:
     1. media:content
@@ -179,8 +209,8 @@ def _extract_image_from_entry(entry: dict) -> Optional[str]:
     if hasattr(entry, 'media_content') and entry.media_content:
         try:
             image_url = entry.media_content[0].get('url')
-            if image_url:
-                logger.debug(f"Found image in media_content: {image_url}")
+            if image_url and _verify_image_url(image_url):
+                logger.debug(f"Found and verified image in media_content: {image_url}")
                 return image_url
         except (IndexError, AttributeError, KeyError):
             pass
@@ -189,8 +219,8 @@ def _extract_image_from_entry(entry: dict) -> Optional[str]:
     if hasattr(entry, 'media_thumbnail') and entry.media_thumbnail:
         try:
             image_url = entry.media_thumbnail[0].get('url')
-            if image_url:
-                logger.debug(f"Found image in media_thumbnail: {image_url}")
+            if image_url and _verify_image_url(image_url):
+                logger.debug(f"Found and verified image in media_thumbnail: {image_url}")
                 return image_url
         except (IndexError, AttributeError, KeyError):
             pass
@@ -201,16 +231,17 @@ def _extract_image_from_entry(entry: dict) -> Optional[str]:
             enc_type = enclosure.get('type', '')
             enc_url = enclosure.get('href') or enclosure.get('url')
             if enc_url and ('image' in enc_type or _is_valid_image_url(enc_url)):
-                logger.debug(f"Found image in enclosures: {enc_url}")
-                return enc_url
+                if _verify_image_url(enc_url):
+                    logger.debug(f"Found and verified image in enclosures: {enc_url}")
+                    return enc_url
 
     # 4. Check <img> tags in content
     if hasattr(entry, 'content') and entry.content:
         try:
             html_content = entry.content[0].get('value', '')
             image_url = _extract_first_image_from_html(html_content)
-            if image_url:
-                logger.debug(f"Found image in content HTML: {image_url}")
+            if image_url and _verify_image_url(image_url):
+                logger.debug(f"Found and verified image in content HTML: {image_url}")
                 return image_url
         except (IndexError, AttributeError, KeyError):
             pass
@@ -219,8 +250,8 @@ def _extract_image_from_entry(entry: dict) -> Optional[str]:
     summary = entry.get('summary') or entry.get('description', '')
     if summary:
         image_url = _extract_first_image_from_html(summary)
-        if image_url:
-            logger.debug(f"Found image in summary HTML: {image_url}")
+        if image_url and _verify_image_url(image_url):
+            logger.debug(f"Found and verified image in summary HTML: {image_url}")
             return image_url
 
     # 6. Check direct image field
@@ -229,8 +260,8 @@ def _extract_image_from_entry(entry: dict) -> Optional[str]:
             image_url = entry.image.get('href') or entry.image.get('url')
         else:
             image_url = str(entry.image)
-        if image_url:
-            logger.debug(f"Found image in image field: {image_url}")
+        if image_url and _verify_image_url(image_url):
+            logger.debug(f"Found and verified image in image field: {image_url}")
             return image_url
 
     return None
@@ -239,6 +270,7 @@ def _extract_image_from_entry(entry: dict) -> Optional[str]:
 def _extract_best_image(soup: BeautifulSoup, base_url: str) -> Optional[str]:
     """
     Extract the best image from an article page with comprehensive fallback chain.
+    Verifies each URL returns HTTP 200 before accepting it.
 
     Checks in order:
     1. og:image meta tag
@@ -253,31 +285,36 @@ def _extract_best_image(soup: BeautifulSoup, base_url: str) -> Optional[str]:
     # 1. Check og:image
     og_image = soup.find('meta', property='og:image')
     if og_image and og_image.get('content'):
-        image_url = og_image.get('content')
-        logger.debug(f"Found image in og:image: {image_url}")
-        return _make_absolute_url(image_url, base_url)
+        image_url = _make_absolute_url(og_image.get('content'), base_url)
+        if _verify_image_url(image_url):
+            logger.debug(f"Found and verified image in og:image: {image_url}")
+            return image_url
 
     # 2. Check twitter:image
     twitter_image = soup.find('meta', attrs={'name': 'twitter:image'})
     if twitter_image and twitter_image.get('content'):
-        image_url = twitter_image.get('content')
-        logger.debug(f"Found image in twitter:image: {image_url}")
-        return _make_absolute_url(image_url, base_url)
+        image_url = _make_absolute_url(twitter_image.get('content'), base_url)
+        if _verify_image_url(image_url):
+            logger.debug(f"Found and verified image in twitter:image: {image_url}")
+            return image_url
 
     # 3. Check article:image
     article_image = soup.find('meta', property='article:image')
     if article_image and article_image.get('content'):
-        image_url = article_image.get('content')
-        logger.debug(f"Found image in article:image: {image_url}")
-        return _make_absolute_url(image_url, base_url)
+        image_url = _make_absolute_url(article_image.get('content'), base_url)
+        if _verify_image_url(image_url):
+            logger.debug(f"Found and verified image in article:image: {image_url}")
+            return image_url
 
     # 4. Check WordPress featured image classes
     wp_featured = soup.find('img', class_=re.compile(r'wp-post-image|featured-image|post-thumbnail'))
     if wp_featured:
         image_url = wp_featured.get('src') or wp_featured.get('data-src')
         if image_url:
-            logger.debug(f"Found WordPress featured image: {image_url}")
-            return _make_absolute_url(image_url, base_url)
+            image_url = _make_absolute_url(image_url, base_url)
+            if _verify_image_url(image_url):
+                logger.debug(f"Found and verified WordPress featured image: {image_url}")
+                return image_url
 
     # 5. First <img> in article content
     for selector in ['article', 'main', '.post-content', '.entry-content', '.content']:
@@ -287,8 +324,10 @@ def _extract_best_image(soup: BeautifulSoup, base_url: str) -> Optional[str]:
             if img:
                 image_url = img.get('src') or img.get('data-src')
                 if image_url:
-                    logger.debug(f"Found image in article content ({selector}): {image_url}")
-                    return _make_absolute_url(image_url, base_url)
+                    image_url = _make_absolute_url(image_url, base_url)
+                    if _verify_image_url(image_url):
+                        logger.debug(f"Found and verified image in article content ({selector}): {image_url}")
+                        return image_url
 
     # 6. Any reasonably sized image (skip small icons/avatars)
     all_images = soup.find_all('img')
@@ -313,8 +352,10 @@ def _extract_best_image(soup: BeautifulSoup, base_url: str) -> Optional[str]:
 
         image_url = img.get('src') or img.get('data-src')
         if image_url and _is_valid_image_url(image_url):
-            logger.debug(f"Found reasonably sized image: {image_url}")
-            return _make_absolute_url(image_url, base_url)
+            image_url = _make_absolute_url(image_url, base_url)
+            if _verify_image_url(image_url):
+                logger.debug(f"Found and verified reasonably sized image: {image_url}")
+                return image_url
 
     logger.debug("No suitable image found on page")
     return None
