@@ -384,3 +384,99 @@ def get_engagement_stats(client: Client, days: int = 30) -> dict:
     except Exception as e:
         logger.error(f"Error fetching engagement stats: {e}")
         return {"error": str(e)}
+
+
+# ============================================================================
+# TREND ANALYSIS FUNCTIONS
+# ============================================================================
+
+def get_latest_analysis_report(client: Client) -> dict:
+    """Get the most recent analysis report."""
+    try:
+        result = client.table("content_analysis_reports") \
+            .select("*") \
+            .order("period_end", desc=True) \
+            .limit(1) \
+            .execute()
+
+        if not result.data:
+            return {"success": False, "error": "No analysis reports found"}
+
+        report = result.data[0]
+        logger.info(f"Retrieved latest analysis report from {report['period_start']} to {report['period_end']}")
+        return {"success": True, "report": report}
+
+    except Exception as e:
+        logger.error(f"Error fetching latest analysis report: {e}")
+        return {"success": False, "error": str(e)}
+
+
+def get_analysis_reports(client: Client, limit: int = 5) -> list:
+    """Get recent analysis reports."""
+    try:
+        result = client.table("content_analysis_reports") \
+            .select("*") \
+            .order("period_end", desc=True) \
+            .limit(limit) \
+            .execute()
+
+        logger.info(f"Retrieved {len(result.data)} analysis reports")
+        return result.data
+
+    except Exception as e:
+        logger.error(f"Error fetching analysis reports: {e}")
+        return []
+
+
+def get_trending_topics(client: Client, limit: int = 10) -> list:
+    """Get currently trending topics/tags."""
+    try:
+        result = client.table("tag_trending_analysis") \
+            .select("*") \
+            .limit(limit) \
+            .execute()
+
+        trending = [
+            {
+                "tag": row["tag"],
+                "recent_count": row["recent_count"],
+                "historical_count": row["historical_count"],
+                "trending_percentage": round(row.get("trending_percentage", 0), 1),
+                "status": "🔥 Hot" if row.get("trending_percentage", 0) > 50 else "📈 Rising"
+            }
+            for row in result.data
+        ]
+
+        logger.info(f"Retrieved {len(trending)} trending topics")
+        return trending
+
+    except Exception as e:
+        logger.error(f"Error fetching trending topics: {e}")
+        return []
+
+
+def get_content_gaps(client: Client) -> list:
+    """Identify content gaps and opportunities."""
+    try:
+        result = client.rpc("identify_content_gaps").execute()
+
+        if not result.data:
+            return []
+
+        gaps = [
+            {
+                "type": gap["gap_type"],
+                "description": gap["gap_description"],
+                "evidence": gap["evidence"],
+                "priority": gap["priority"]
+            }
+            for gap in result.data
+        ]
+
+        high_priority = len([g for g in gaps if g["priority"] == "high"])
+        logger.info(f"Identified {len(gaps)} content gaps ({high_priority} high-priority)")
+        return gaps
+
+    except Exception as e:
+        logger.error(f"Error identifying content gaps: {e}")
+        return []

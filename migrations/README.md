@@ -253,6 +253,102 @@ RETURNS JSON AS $$
 $$ LANGUAGE plpgsql;
 ```
 
+### 006_create_analysis_reports_table.sql
+**Date:** 2025-01-XX
+**Phase:** Phase 7 - Trend & Gap Analysis
+**Dependencies:** Requires 005_create_learning_tables.sql
+
+Enables automated weekly trend analysis with content gap identification:
+- Weekly analysis reports with trends, gaps, and recommendations
+- Trending topic detection (recent vs historical volume)
+- Top article and source identification
+- Content gap analysis (underserved topics, stale popular topics)
+- Actionable recommendations for next curation cycle
+- Executive summaries for stakeholders
+
+**New Table:**
+- `content_analysis_reports` - Weekly analysis reports with insights
+
+**New Views:**
+- `recent_article_performance` - Articles from last 7 days with engagement
+- `tag_trending_analysis` - Tags ranked by trending percentage
+
+**New Functions:**
+- `identify_content_gaps()` - Finds content opportunities
+
+**Report Fields:**
+- `trending_topics` - Topics with increasing engagement/volume
+- `top_articles` - Best performers in the period
+- `top_sources` - Best performing sources
+- `content_gaps` - Identified gaps and opportunities
+- `recommendations` - Actionable next steps
+- `summary` - Executive summary of key findings
+
+**Gap Types Identified:**
+1. `low_volume_high_engagement` - Categories with high engagement but few articles
+2. `stale_popular_topic` - Popular topics without recent coverage
+
+**Agent Integration:**
+- Agent can query analysis reports for context
+- Tools: `get_latest_analysis_report`, `get_trending_topics`, `get_content_gaps`
+- Uses insights to inform curation decisions
+
+**Running Weekly Analysis:**
+```bash
+# Manual run
+python scripts/run_weekly_analysis.py
+
+# Schedule weekly (crontab example - every Monday at 9am)
+0 9 * * 1 cd /path/to/bonded-content-agent && python scripts/run_weekly_analysis.py
+```
+
+**Example Analysis Report:**
+```json
+{
+  "report_type": "weekly",
+  "period_start": "2025-01-13T00:00:00Z",
+  "period_end": "2025-01-20T00:00:00Z",
+  "trending_topics": {
+    "topics": [
+      {"tag": "communication", "trending_percentage": 85.2, "status": "🔥 Hot"},
+      {"tag": "conflict-resolution", "trending_percentage": 62.1, "status": "🔥 Hot"}
+    ]
+  },
+  "content_gaps": {
+    "gaps": [
+      {
+        "type": "low_volume_high_engagement",
+        "description": "Category \"finances\" has high engagement but few articles",
+        "priority": "high"
+      }
+    ]
+  },
+  "recommendations": {
+    "recommendations": [
+      {
+        "type": "trending_focus",
+        "priority": "high",
+        "recommendation": "Prioritize content covering: communication, conflict-resolution, intimacy"
+      }
+    ]
+  },
+  "summary": "📊 Week in Review: Published 15 articles with 1,234 total views..."
+}
+```
+
+**Python Integration:**
+```python
+from src.analysis_agent import TrendAnalysisAgent
+from src.database import get_supabase_client
+
+client = get_supabase_client()
+agent = TrendAnalysisAgent(client)
+
+# Run weekly analysis
+result = agent.analyze_week(days=7)
+print(result["summary"])
+```
+
 ## Verification
 
 After applying a migration, verify the changes:

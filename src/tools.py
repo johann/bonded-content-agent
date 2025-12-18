@@ -13,7 +13,11 @@ from urllib.parse import urljoin, urlparse
 import re
 from supabase import Client
 
-from database import check_article_exists, save_article, get_existing_urls, get_top_performing_articles, get_engagement_stats
+from database import (
+    check_article_exists, save_article, get_existing_urls,
+    get_top_performing_articles, get_engagement_stats,
+    get_latest_analysis_report, get_trending_topics, get_content_gaps
+)
 
 logger = logging.getLogger(__name__)
 
@@ -194,6 +198,39 @@ TOOL_DEFINITIONS = [
                     "default": 30
                 }
             },
+            "required": []
+        }
+    },
+    {
+        "name": "get_latest_analysis_report",
+        "description": "Get the most recent weekly trend analysis report with trending topics, top articles, content gaps, and recommendations.",
+        "input_schema": {
+            "type": "object",
+            "properties": {},
+            "required": []
+        }
+    },
+    {
+        "name": "get_trending_topics",
+        "description": "Get currently trending topics/tags based on recent vs historical volume. Shows what topics are gaining traction with users.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "limit": {
+                    "type": "integer",
+                    "description": "Number of trending topics to retrieve (default: 10)",
+                    "default": 10
+                }
+            },
+            "required": []
+        }
+    },
+    {
+        "name": "get_content_gaps",
+        "description": "Identify content gaps and opportunities - topics with high engagement but low coverage, or popular topics without recent articles.",
+        "input_schema": {
+            "type": "object",
+            "properties": {},
             "required": []
         }
     }
@@ -675,6 +712,19 @@ def execute_tool(tool_name: str, tool_input: dict, supabase_client: Client) -> s
                 supabase_client,
                 days=tool_input.get("days", 30)
             )
+        elif tool_name == "get_latest_analysis_report":
+            result = get_latest_analysis_report(supabase_client)
+        elif tool_name == "get_trending_topics":
+            result = {
+                "trending_topics": get_trending_topics(
+                    supabase_client,
+                    limit=tool_input.get("limit", 10)
+                )
+            }
+        elif tool_name == "get_content_gaps":
+            result = {
+                "content_gaps": get_content_gaps(supabase_client)
+            }
         else:
             result = {"error": f"Unknown tool: {tool_name}"}
             
