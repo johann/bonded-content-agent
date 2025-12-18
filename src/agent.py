@@ -7,30 +7,45 @@ import json
 from anthropic import Anthropic
 from supabase import Client
 
-from config import ANTHROPIC_API_KEY, BLOG_SOURCES, SYSTEM_PROMPT, MAX_ARTICLES_PER_RUN
+from config import ANTHROPIC_API_KEY, SYSTEM_PROMPT, MAX_ARTICLES_PER_RUN
 from tools import TOOL_DEFINITIONS, execute_tool
+from database import get_active_sources, update_source_stats, update_source_avg_score
 
 logger = logging.getLogger(__name__)
 
 
 class BondedContentAgent:
     """Agent that curates relationship content from blogs."""
-    
+
     def __init__(self, supabase_client: Client):
         self.client = Anthropic(api_key=ANTHROPIC_API_KEY)
         self.supabase = supabase_client
         self.messages = []
         self.articles_saved = 0
         self.articles_skipped = 0
-        
+        self.source_stats = {}  # Track stats per source for updating at end
+
     def run(self) -> dict:
         """Run the content curation agent."""
         logger.info("Starting Bonded Content Agent")
-        
+
+        # Load active sources from database
+        blog_sources = get_active_sources(self.supabase)
+
+        if not blog_sources:
+            logger.error("No active sources found in database")
+            return {
+                "success": False,
+                "error": "No active sources found in database. Run scripts/migrate_sources_to_db.py first.",
+                "articles_saved": 0
+            }
+
+        logger.info(f"Loaded {len(blog_sources)} active sources")
+
         # Prepare the initial message with blog sources
         sources_info = "\n".join([
-            f"- {s['name']}: RSS at {s['rss']}" 
-            for s in BLOG_SOURCES
+            f"- {s['name']}: RSS at {s['rss_url']} (source_id: {s['id']})"
+            for s in blog_sources
         ])
         
         initial_message = f"""Please curate new relationship content for Bonded from these blog sources:

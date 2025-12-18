@@ -65,6 +65,42 @@ Adds AI-generated content transformations for richer user experience:
 - `key_takeaways_count` - Ensures 3-5 takeaways
 - `discussion_questions_count` - Ensures 2-3 questions
 
+###003_create_sources_table.sql
+**Date:** 2025-01-XX
+**Phase:** Phase 3 - Source Management
+**Dependencies:** None (but runs after 001 and 002)
+
+Moves blog sources from hardcoded config to database with quality tracking:
+- Source metadata (name, URLs, description)
+- Fetch statistics (success/failure counts, last fetch time)
+- Article statistics (found, saved, rejected counts)
+- Quality metrics (acceptance rate, avg article score)
+- Auto-disable sources after 5 consecutive failures
+- Links articles to their sources via source_id
+
+**New Table:**
+- `sources` - Blog sources with quality tracking
+
+**New Column on articles:**
+- `source_id` (UUID) - Foreign key to sources table
+
+**Indexes:**
+- `idx_sources_is_active` - Filter active sources
+- `idx_sources_acceptance_rate` - Sort by quality
+- `idx_sources_avg_article_score` - Sort by article quality
+- `idx_sources_last_fetch_at` - Track freshness
+- `idx_articles_source_id` - Link articles to sources
+
+**Constraints:**
+- `acceptance_rate_range` - Ensures 0-100%
+- `avg_article_score_range` - Ensures 0-10
+
+**Post-Migration:**
+After running this migration, populate sources from hardcoded config:
+```bash
+python scripts/migrate_sources_to_db.py
+```
+
 ## Verification
 
 After applying a migration, verify the changes:

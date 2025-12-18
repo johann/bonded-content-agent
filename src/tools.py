@@ -144,9 +144,13 @@ TOOL_DEFINITIONS = [
                     "minItems": 2,
                     "maxItems": 3,
                     "description": "2-3 thought-provoking questions for couples to discuss together"
+                },
+                "source_id": {
+                    "type": "string",
+                    "description": "The UUID of the source this article came from (provided in the source list)"
                 }
             },
-            "required": ["title", "blurb", "url", "image_url", "relevance_score", "actionability_score", "depth_score", "freshness_score", "category", "tags", "reading_time_minutes", "difficulty", "summary_short", "summary_detailed", "key_takeaways", "discussion_questions"]
+            "required": ["title", "blurb", "url", "image_url", "relevance_score", "actionability_score", "depth_score", "freshness_score", "category", "tags", "reading_time_minutes", "difficulty", "summary_short", "summary_detailed", "key_takeaways", "discussion_questions", "source_id"]
         }
     },
     {
@@ -542,7 +546,8 @@ def save_article_to_database(
     summary_short: Optional[str] = None,
     summary_detailed: Optional[str] = None,
     key_takeaways: Optional[list] = None,
-    discussion_questions: Optional[list] = None
+    discussion_questions: Optional[list] = None,
+    source_id: Optional[str] = None
 ) -> dict:
     """Save an article to the database with quality scores, metadata, and content transformations."""
     # Double-check it doesn't exist
@@ -570,10 +575,12 @@ def save_article_to_database(
         summary_short,
         summary_detailed,
         key_takeaways,
-        discussion_questions
+        discussion_questions,
+        source_id
     )
     result["url"] = url
     result["title"] = title
+    result["source_id"] = source_id
     return result
 
 
@@ -615,7 +622,8 @@ def execute_tool(tool_name: str, tool_input: dict, supabase_client: Client) -> s
                 summary_short=tool_input.get("summary_short"),
                 summary_detailed=tool_input.get("summary_detailed"),
                 key_takeaways=tool_input.get("key_takeaways"),
-                discussion_questions=tool_input.get("discussion_questions")
+                discussion_questions=tool_input.get("discussion_questions"),
+                source_id=tool_input.get("source_id")
             )
         elif tool_name == "get_all_existing_urls":
             result = get_all_existing_urls_tool(supabase_client)

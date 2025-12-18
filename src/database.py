@@ -111,7 +111,8 @@ def save_article(
     summary_short: str = None,
     summary_detailed: str = None,
     key_takeaways: list = None,
-    discussion_questions: list = None
+    discussion_questions: list = None,
+    source_id: str = None
 ) -> dict:
     """Save a new article to the database with quality scores, metadata, and content transformations."""
     try:
@@ -121,6 +122,10 @@ def save_article(
             "url": url,
             "is_active": True,
         }
+
+        # Add source tracking
+        if source_id:
+            data["source_id"] = source_id
 
         # Add optional fields if provided
         if image_url:
@@ -180,3 +185,116 @@ def get_article_count(client: Client) -> int:
     except Exception as e:
         logger.error(f"Error getting article count: {e}")
         return 0
+
+
+# ============================================================================
+# SOURCE MANAGEMENT FUNCTIONS
+# ============================================================================
+
+def get_active_sources(client: Client) -> list:
+    """Get all active sources from the database."""
+    try:
+        result = client.table("sources").select("*").eq("is_active", True).order("name").execute()
+        logger.info(f"Loaded {len(result.data)} active sources from database")
+        return result.data
+    except Exception as e:
+        logger.error(f"Error fetching active sources: {e}")
+        return []
+
+
+def update_source_stats(
+    client: Client,
+    source_id: str,
+    fetch_success: bool,
+    articles_found: int = 0,
+    articles_saved: int = 0
+) -> dict:
+    """Update source statistics after a fetch operation."""
+    try:
+        # Get current source data
+        source_result = client.table("sources").select("*").eq("id", source_id).execute()
+        if not source_result.data:
+            return {"success": False, "error": "Source not found"}
+
+        source = source_result.data[0]
+
+        # Calculate new stats
+        total_fetches = source.get("total_fetches", 0) + 1
+        successful_fetches = source.get("successful_fetches", 0) + (1 if fetch_success else 0)
+        failed_fetches = source.get("failed_fetches", 0) + (0 if fetch_success else 1)
+        consecutive_failures = 0 if fetch_success else source.get("consecutive_failures", 0) + 1
+
+        total_articles_found = source.get("articles_found", 0) + articles_found
+        total_articles_saved = source.get("articles_saved", 0) + articles_saved
+        total_articles_rejected = total_articles_found - total_articles_saved
+
+        # Calculate acceptance rate
+        acceptance_rate = None
+        if total_articles_found > 0:
+            acceptance_rate = (total_articles_saved / total_articles_found) * 100
+
+        # Auto-disable sources with too many consecutive failures
+        is_active = source.get("is_active", True)
+        if consecutive_failures >= 5:
+            is_active = False
+            logger.warning(f"Auto-disabling source {source['name']} after {consecutive_failures} consecutive failures")
+
+        # Update source
+        update_data = {
+            "last_fetch_at": "now()",
+            "last_fetch_success": fetch_success,
+            "total_fetches": total_fetches,
+            "successful_fetches": successful_fetches,
+            "failed_fetches": failed_fetches,
+            "consecutive_failures": consecutive_failures,
+            "articles_found": total_articles_found,
+            "articles_saved": total_articles_saved,
+            "articles_rejected": total_articles_rejected,
+            "is_active": is_active
+        }
+
+        if acceptance_rate is not None:
+            update_data["acceptance_rate"] = round(acceptance_rate, 2)
+
+        result = client.table("sources").update(update_data).eq("id", source_id).execute()
+
+        acceptance_display = f"{acceptance_rate:.1f}%" if acceptance_rate is not None else "N/A"
+        logger.info(
+            f"Updated source stats: {source['name']} "
+            f"(fetches: {total_fetches}, acceptance: {acceptance_display})"
+        )
+
+        return {"success": True, "source_id": source_id}
+
+    except Exception as e:
+        logger.error(f"Error updating source stats: {e}")
+        return {"success": False, "error": str(e)}
+
+
+def update_source_avg_score(client: Client, source_id: str) -> dict:
+    """Recalculate and update the average article score for a source."""
+    try:
+        # Get all articles from this source
+        result = client.table("articles").select("overall_score").eq("source_id", source_id).execute()
+
+        if not result.data:
+            return {"success": True, "avg_score": None}
+
+        # Calculate average score
+        scores = [article["overall_score"] for article in result.data if article.get("overall_score") is not None]
+
+        if not scores:
+            return {"success": True, "avg_score": None}
+
+        avg_score = sum(scores) / len(scores)
+
+        # Update source
+        client.table("sources").update({"avg_article_score": round(avg_score, 1)}).eq("id", source_id).execute()
+
+        logger.info(f"Updated source average score: {avg_score:.1f} (from {len(scores)} articles)")
+
+        return {"success": True, "avg_score": avg_score}
+
+    except Exception as e:
+        logger.error(f"Error updating source average score: {e}")
+        return {"success": False, "error": str(e)}
