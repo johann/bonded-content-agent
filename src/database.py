@@ -155,12 +155,15 @@ def save_article(
         if discussion_questions:
             data["discussion_questions"] = discussion_questions
 
-        # Calculate overall score as average of the 4 dimension scores
+        # Note: overall_score is a generated column in the database, so we don't insert it
+        # It will be automatically calculated by the database based on the 4 dimension scores
+        # Calculate it here only for logging purposes
+        calculated_overall_score = None
         if all(score is not None for score in [relevance_score, actionability_score, depth_score, freshness_score]):
-            data["overall_score"] = (relevance_score + actionability_score + depth_score + freshness_score) / 4
+            calculated_overall_score = (relevance_score + actionability_score + depth_score + freshness_score) / 4
 
         result = client.table("articles").insert(data).execute()
-        logger.info(f"Saved article: {title} (category: {category}, overall_score: {data.get('overall_score', 'N/A')}, takeaways: {len(key_takeaways) if key_takeaways else 0})")
+        logger.info(f"Saved article: {title} (category: {category}, overall_score: {calculated_overall_score:.1f if calculated_overall_score is not None else 'N/A'}, takeaways: {len(key_takeaways) if key_takeaways else 0})")
         return {"success": True, "id": result.data[0]["id"] if result.data else None}
     except Exception as e:
         logger.error(f"Error saving article: {e}")
@@ -562,4 +565,147 @@ def get_article_with_related(client: Client, article_id: str) -> dict:
 
     except Exception as e:
         logger.error(f"Error fetching article with related content: {e}")
+        return {"success": False, "error": str(e)}
+
+
+# ============================================================================
+# COLLECTIONS FUNCTIONS
+# ============================================================================
+
+def get_all_collections(client: Client, include_inactive: bool = False) -> list:
+    """Get all collections."""
+    try:
+        query = client.table("collections_with_articles").select("*")
+
+        if not include_inactive:
+            query = query.eq("is_active", True)
+
+        result = query.order("display_order", desc=False).order("created_at", desc=True).execute()
+
+        logger.info(f"Retrieved {len(result.data)} collections")
+        return result.data
+
+    except Exception as e:
+        logger.error(f"Error fetching collections: {e}")
+        return []
+
+
+def get_collection_by_slug(client: Client, slug: str) -> dict:
+    """Get a specific collection by slug."""
+    try:
+        result = client.table("collections_with_articles") \
+            .select("*") \
+            .eq("slug", slug) \
+            .eq("is_active", True) \
+            .execute()
+
+        if not result.data:
+            return {"success": False, "error": "Collection not found"}
+
+        collection = result.data[0]
+        logger.info(f"Retrieved collection: {collection['title']} ({collection['article_count']} articles)")
+
+        return {
+            "success": True,
+            "collection": collection
+        }
+
+    except Exception as e:
+        logger.error(f"Error fetching collection by slug: {e}")
+        return {"success": False, "error": str(e)}
+
+
+def generate_category_collection(client: Client, category: str, limit: int = 10) -> dict:
+    """Generate a collection for a specific category."""
+    try:
+        result = client.rpc("generate_category_collection", {
+            "p_category": category,
+            "p_limit": limit
+        }).execute()
+
+        collection_id = result.data
+
+        logger.info(f"Generated category collection for '{category}': {collection_id}")
+
+        return {
+            "success": True,
+            "collection_id": collection_id,
+            "category": category
+        }
+
+    except Exception as e:
+        logger.error(f"Error generating category collection: {e}")
+        return {"success": False, "error": str(e)}
+
+
+def generate_tag_collection(
+    client: Client,
+    tag: str,
+    title: str = None,
+    description: str = None,
+    limit: int = 8
+) -> dict:
+    """Generate a collection for a specific tag."""
+    try:
+        result = client.rpc("generate_tag_collection", {
+            "p_tag": tag,
+            "p_title": title,
+            "p_description": description,
+            "p_limit": limit
+        }).execute()
+
+        collection_id = result.data
+
+        logger.info(f"Generated tag collection for '{tag}': {collection_id}")
+
+        return {
+            "success": True,
+            "collection_id": collection_id,
+            "tag": tag
+        }
+
+    except Exception as e:
+        logger.error(f"Error generating tag collection: {e}")
+        return {"success": False, "error": str(e)}
+
+
+def generate_high_engagement_collection(client: Client, days: int = 30, limit: int = 10) -> dict:
+    """Generate a 'Best of' collection with top performing articles."""
+    try:
+        result = client.rpc("generate_high_engagement_collection", {
+            "p_days": days,
+            "p_limit": limit
+        }).execute()
+
+        collection_id = result.data
+
+        logger.info(f"Generated high engagement collection: {collection_id}")
+
+        return {
+            "success": True,
+            "collection_id": collection_id
+        }
+
+    except Exception as e:
+        logger.error(f"Error generating high engagement collection: {e}")
+        return {"success": False, "error": str(e)}
+
+
+def generate_all_category_collections(client: Client) -> dict:
+    """Generate collections for all 8 categories."""
+    try:
+        result = client.rpc("generate_all_category_collections").execute()
+
+        collections = result.data if result.data else []
+
+        logger.info(f"Generated {len(collections)} category collections")
+
+        return {
+            "success": True,
+            "collections": collections,
+            "count": len(collections)
+        }
+
+    except Exception as e:
+        logger.error(f"Error generating all category collections: {e}")
         return {"success": False, "error": str(e)}

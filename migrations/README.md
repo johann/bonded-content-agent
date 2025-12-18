@@ -441,6 +441,136 @@ print(f"Related articles: {len(article['related_articles'])}")
 - View provides convenient JSON format for API responses
 - Automatic updates via trigger
 
+### 008_create_collections.sql
+**Date:** 2025-01-XX
+**Phase:** Phase 9 - Auto-Generated Collections
+**Dependencies:** Requires 001_add_quality_scores.sql, 004_create_engagement_tables.sql
+
+Enables automatic creation of curated article collections organized by theme, category, and engagement:
+- Collections table for storing curated groups of articles
+- Junction table for flexible article-to-collection mapping
+- Multiple collection types (category, tag, trending, high-engagement, etc.)
+- Automated collection generation functions
+- Stats tracking (article count, engagement, views, saves)
+- Display ordering and theming
+
+**New Tables:**
+- `collections` - Collection metadata and stats
+- `collection_articles` - Junction table linking articles to collections
+
+**New View:**
+- `collections_with_articles` - Collections with articles embedded as JSON
+
+**New Functions:**
+- `generate_category_collection(category, limit)` - Create category-based collection
+- `generate_tag_collection(tag, title, description, limit)` - Create tag-based collection
+- `generate_high_engagement_collection(days, limit)` - Create "Most Popular" collection
+- `generate_all_category_collections()` - Create all 8 category collections
+- `refresh_collection_stats(collection_id)` - Recalculate collection statistics
+
+**Collection Types:**
+- `category_based` - All articles in a category (communication, conflict, etc.)
+- `tag_based` - Articles with specific tag(s)
+- `curated_theme` - Hand-picked themed collection
+- `trending_topic` - Based on trending analysis
+- `high_engagement` - Top performing articles
+- `related_cluster` - Related articles cluster
+- `beginner_friendly` - Beginner difficulty articles
+- `deep_dive` - Advanced/in-depth articles
+
+**Category Collections:**
+Each of the 8 categories gets a curated collection with:
+- Custom title and description
+- Themed icon (emoji)
+- Color theme for UI
+- Top 10 articles by engagement + quality
+
+**Agent Integration:**
+- Tools: `get_all_collections`, `get_collection_by_slug`
+- Agent can query collections to understand content organization
+- Can use collections for strategic curation context
+
+**Usage Examples:**
+
+```sql
+-- Generate all category collections
+SELECT * FROM generate_all_category_collections();
+
+-- Generate communication category collection
+SELECT generate_category_collection('communication', 10);
+
+-- Generate tag-based collection
+SELECT generate_tag_collection('active-listening', 'Active Listening Skills', 'Learn to truly hear your partner', 8);
+
+-- Generate high engagement collection
+SELECT generate_high_engagement_collection(30, 10);
+
+-- View all collections with articles
+SELECT * FROM collections_with_articles;
+
+-- Refresh stats for a collection
+SELECT refresh_collection_stats('collection-uuid-here');
+```
+
+**Python Integration:**
+```python
+from src.database import (
+    generate_all_category_collections,
+    generate_high_engagement_collection,
+    generate_tag_collection,
+    get_all_collections,
+    get_collection_by_slug,
+    get_supabase_client
+)
+
+client = get_supabase_client()
+
+# Generate all collections
+result = generate_all_category_collections(client)
+print(f"Generated {result['count']} collections")
+
+# Generate high engagement collection
+result = generate_high_engagement_collection(client, days=30, limit=10)
+
+# Get all collections
+collections = get_all_collections(client)
+for c in collections:
+    print(f"{c['title']}: {c['article_count']} articles")
+
+# Get specific collection
+result = get_collection_by_slug(client, 'category-communication')
+collection = result['collection']
+```
+
+**Generate Collections Script:**
+```bash
+# Run collection generator
+python scripts/generate_collections.py
+
+# Schedule weekly (crontab - every Monday after curation)
+0 10 * * 1 cd /path/to/bonded-content-agent && python scripts/generate_collections.py
+```
+
+**What Gets Generated:**
+1. All 8 category collections (communication, conflict, intimacy, trust, parenting, finances, growth, wellness)
+2. "Most Popular Articles" collection (top performers)
+3. Collections for top 3 trending topics
+4. Collections for popular tags (active-listening, love-languages, emotional-intelligence, date-night)
+
+**Use Cases:**
+- Browse by category in app UI
+- Featured collections on home screen
+- "Most Popular" / "Trending" sections
+- Topic-based discovery
+- Beginner-friendly learning paths
+- Content organization and navigation
+
+**Performance:**
+- Indexed for fast queries
+- Pre-calculated stats
+- View provides convenient JSON format for API
+- Minimal overhead on article inserts
+
 ## Verification
 
 After applying a migration, verify the changes:
