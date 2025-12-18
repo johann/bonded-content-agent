@@ -171,6 +171,88 @@ Then refresh metrics periodically (cron job or edge function):
 SELECT refresh_all_article_engagement();
 ```
 
+### 005_create_learning_tables.sql
+**Date:** 2025-01-XX
+**Phase:** Phase 6 - Feedback Loop & Learning
+**Dependencies:** Requires 004_create_engagement_tables.sql
+
+Closes the learning loop - agent learns from engagement data and improves over time:
+- Stores learned insights (top sources, categories, topics)
+- Logs all agent decisions with reasoning
+- Dynamic system prompt incorporates learnings
+- Automated learning analysis
+- Confidence scoring based on data quality
+
+**New Tables:**
+- `agent_learnings` - Stored insights from engagement analysis
+- `agent_decisions` - Log of every save/skip decision with reasoning
+
+**Learning Types:**
+- `source_performance` - Which sources produce engaging content
+- `category_performance` - Which categories users engage with most
+- `topic_performance` - Trending topics/tags
+- `blurb_effectiveness` - What blurb styles work best (future)
+- `content_pattern` - Common patterns in high-performing content (future)
+- `user_preference` - User segment preferences (future)
+- `seasonal_trend` - Time-based patterns (future)
+
+**Views:**
+- `source_performance_view` - Sources ranked by engagement
+- `category_performance_view` - Categories ranked by engagement
+- `tag_performance_view` - Tags/topics ranked by engagement
+
+**Functions:**
+- `calculate_confidence(data_points, period_days)` - Confidence scoring
+
+**Agent Integration:**
+- Agent loads learnings at startup
+- System prompt dynamically enhanced with learned insights
+- Agent prioritizes proven high-performing content
+- Decisions logged for future analysis
+
+**Learning Workflow:**
+1. Run `update_learnings()` weekly via cron or manually
+2. Analyzes engagement data to derive insights
+3. Saves learnings to database with confidence scores
+4. Next agent run automatically incorporates learnings
+5. Agent becomes smarter over time
+
+**Example Learnings:**
+```json
+{
+  "learning_type": "category_performance",
+  "key": "top_categories",
+  "value": {
+    "top_categories": [
+      {"category": "communication", "avg_engagement_score": 42.5},
+      {"category": "conflict", "avg_engagement_score": 38.2}
+    ]
+  },
+  "confidence": 0.85,
+  "data_points": 127
+}
+```
+
+**Running Learning Analysis:**
+```python
+from src.learning import update_learnings
+from src.database import get_supabase_client
+
+client = get_supabase_client()
+result = update_learnings(client, days=30)
+# Analyzes last 30 days, saves learnings
+```
+
+Or create a cron job/edge function:
+```sql
+-- Custom function to run weekly
+CREATE OR REPLACE FUNCTION run_weekly_learning_analysis()
+RETURNS JSON AS $$
+  -- Call Python function via pg_python extension or external service
+  -- Or implement learning logic in PL/pgSQL
+$$ LANGUAGE plpgsql;
+```
+
 ## Verification
 
 After applying a migration, verify the changes:

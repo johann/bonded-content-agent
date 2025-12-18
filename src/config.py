@@ -249,3 +249,78 @@ IMAGE REQUIREMENTS (CRITICAL):
 - Images are essential for the user experience in the Bonded app
 
 Be selective - quality over quantity. Only save content that genuinely helps couples. The overall_score (average of 4 dimensions) will be automatically calculated and stored."""
+
+
+def get_dynamic_system_prompt(learnings: dict = None) -> str:
+    """
+    Generate system prompt with learnings incorporated.
+
+    Args:
+        learnings: Dict of current learnings from database
+
+    Returns:
+        Enhanced system prompt with learned insights
+    """
+    prompt = SYSTEM_PROMPT
+
+    if not learnings:
+        return prompt
+
+    # Add learnings section if we have data
+    learnings_section = "\n\n" + "="*60 + "\n"
+    learnings_section += "LEARNED INSIGHTS FROM USER ENGAGEMENT\n"
+    learnings_section += "="*60 + "\n\n"
+    learnings_section += "Based on recent user behavior, prioritize content that matches these patterns:\n\n"
+
+    has_learnings = False
+
+    # Add top sources if available
+    if "top_sources" in learnings:
+        source_data = learnings["top_sources"]["data"]
+        if source_data.get("top_sources"):
+            has_learnings = True
+            learnings_section += "**HIGH-PERFORMING SOURCES:**\n"
+            learnings_section += "These sources consistently produce engaging content. Prioritize articles from:\n"
+            for source in source_data["top_sources"][:3]:
+                learnings_section += f"- {source['name']} (engagement: {source['avg_engagement_score']}, quality: {source['avg_article_score']})\n"
+            learnings_section += "\n"
+
+    # Add top categories if available
+    if "top_categories" in learnings:
+        category_data = learnings["top_categories"]["data"]
+        if category_data.get("top_categories"):
+            has_learnings = True
+            learnings_section += "**HIGH-ENGAGEMENT CATEGORIES:**\n"
+            learnings_section += "Users engage most with these categories. Favor content in:\n"
+            for cat in category_data["top_categories"][:3]:
+                learnings_section += f"- {cat['category'].upper()} (engagement: {cat['avg_engagement_score']}, save rate: {cat['avg_save_rate']}%)\n"
+            learnings_section += "\n"
+
+    # Add top topics if available
+    if "top_topics" in learnings:
+        topic_data = learnings["top_topics"]["data"]
+        if topic_data.get("top_topics"):
+            has_learnings = True
+            learnings_section += "**TRENDING TOPICS:**\n"
+            learnings_section += "These topics/tags resonate strongly with users:\n"
+            topics = ", ".join([t['tag'] for t in topic_data["top_topics"][:10]])
+            learnings_section += f"{topics}\n\n"
+            learnings_section += "Look for articles covering these topics.\n\n"
+
+    # Only add learnings section if we have actual data
+    if has_learnings:
+        learnings_section += "**APPLY THESE LEARNINGS:**\n"
+        learnings_section += "- When choosing between similar articles, favor topics/categories that users engage with\n"
+        learnings_section += "- Use learned patterns to identify potentially high-performing content\n"
+        learnings_section += "- Don't exclusively focus on high-performing areas, but weight them more heavily\n"
+        learnings_section += "="*60 + "\n"
+
+        # Insert learnings after the initial workflow but before evaluation criteria
+        insertion_point = prompt.find("CONTENT EVALUATION")
+        if insertion_point > 0:
+            prompt = prompt[:insertion_point] + learnings_section + "\n" + prompt[insertion_point:]
+        else:
+            # Fallback: add at end
+            prompt += "\n" + learnings_section
+
+    return prompt

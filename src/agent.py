@@ -7,9 +7,11 @@ import json
 from anthropic import Anthropic
 from supabase import Client
 
-from config import ANTHROPIC_API_KEY, SYSTEM_PROMPT, MAX_ARTICLES_PER_RUN
+from config import ANTHROPIC_API_KEY, MAX_ARTICLES_PER_RUN, get_dynamic_system_prompt
 from tools import TOOL_DEFINITIONS, execute_tool
 from database import get_active_sources, update_source_stats, update_source_avg_score
+from learning import get_current_learnings
+import uuid
 
 logger = logging.getLogger(__name__)
 
@@ -24,10 +26,18 @@ class BondedContentAgent:
         self.articles_saved = 0
         self.articles_skipped = 0
         self.source_stats = {}  # Track stats per source for updating at end
+        self.run_id = str(uuid.uuid4())  # Unique ID for this run
 
     def run(self) -> dict:
         """Run the content curation agent."""
-        logger.info("Starting Bonded Content Agent")
+        logger.info(f"Starting Bonded Content Agent (run_id: {self.run_id})")
+
+        # Load learnings from database
+        learnings = get_current_learnings(self.supabase)
+        logger.info(f"Loaded {len(learnings)} learnings")
+
+        # Generate dynamic system prompt with learnings
+        system_prompt = get_dynamic_system_prompt(learnings)
 
         # Load active sources from database
         blog_sources = get_active_sources(self.supabase)
@@ -71,11 +81,11 @@ Focus on quality over quantity. Skip promotional content and articles that don't
             iteration += 1
             logger.info(f"Agent iteration {iteration}")
             
-            # Call Claude
+            # Call Claude with dynamic system prompt
             response = self.client.messages.create(
                 model="claude-sonnet-4-5-20250929",
                 max_tokens=4096,
-                system=SYSTEM_PROMPT,
+                system=system_prompt,
                 tools=TOOL_DEFINITIONS,
                 messages=self.messages
             )
