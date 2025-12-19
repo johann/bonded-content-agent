@@ -278,7 +278,7 @@ TOOL_DEFINITIONS = [
                 "include_inactive": {
                     "type": "boolean",
                     "description": "Whether to include inactive collections (default: false)",
-                    "default": false
+                    "default": False
                 }
             },
             "required": []
